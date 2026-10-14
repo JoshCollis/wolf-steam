@@ -1,0 +1,7 @@
+__pycache__/
+artifacts/
+*.pyc
+.env
+.env.*
+!.env.example
+*.log

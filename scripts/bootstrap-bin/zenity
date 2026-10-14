@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+question=false
+title=false
+for arg in "$@"; do
+    [ "$arg" != --question ] || question=true
+    [ "$arg" != '--title=Steam installer' ] || title=true
+done
+if $question && $title; then
+    printf 'whale-steam: installing the official proprietary Steam bootstrap in persistent HOME\n' >&2
+    exit 0
+fi
+exec /usr/bin/zenity "$@"

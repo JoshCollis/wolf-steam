@@ -1,0 +1,33 @@
+# Add to a separate Wolf profile and check the generated mounts before launching.
+# Wolf supplies per-lobby WAYLAND_DISPLAY, GAMESCOPE_WIDTH/HEIGHT/REFRESH, input/audio mounts,
+# and a per-profile/app HOME mount. Verify those generated mounts before launching.
+[[apps]]
+title = "Steam"
+[apps.runner]
+type = "docker"
+name = "WolfSteam"
+image = "ghcr.io/joshcollis/wolf-steam:latest"
+mounts = []
+env = [
+  "RUN_SWAY=false",
+  "RUN_GAMESCOPE=true",
+  "PUID=1000",
+  "PGID=1000",
+  "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/*",
+]
+devices = []
+ports = []
+# Compatibility-first scoped test policy. Deliberately no privileged or SYS_ADMIN.
+# Broader than a hardened production policy: narrow after Proton/input acceptance.
+base_create_json = """
+{
+  "HostConfig": {
+    "IpcMode": "host",
+    "CapAdd": ["SYS_NICE"],
+    "SecurityOpt": ["seccomp=unconfined", "apparmor=unconfined"],
+    "Ulimits": [{"Name":"nofile", "Hard":1048576, "Soft":1048576}],
+    "Privileged": false,
+    "DeviceCgroupRules": ["c 13:* rmw"]
+  }
+}
+"""

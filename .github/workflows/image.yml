@@ -1,0 +1,51 @@
+name: Build, test and publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build and test
+        env:
+          IMAGE_SOURCE: https://github.com/${{ github.repository }}
+        run: bash tests/run-local.sh
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${REPOSITORY,,}"
+          for tag in "sha-${REVISION}" main latest; do
+            docker tag whale-steam:local-test "${image}:${tag}"
+            docker push "${image}:${tag}"
+          done
+          docker buildx imagetools inspect "${image}:sha-${REVISION}"
+          printf 'Published `%s:sha-%s`, `%s:main` and `%s:latest`.\n' "$image" "$REVISION" "$image" "$image" >> "$GITHUB_STEP_SUMMARY"
