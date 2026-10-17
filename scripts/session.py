@@ -69,7 +69,11 @@ def main():
         raise ValueError('RUN_SWAY is unsupported for negotiated refresh; use RUN_SWAY=false')
     env = parent_env.copy()
     env.pop('DISPLAY', None)
-    command = sys.argv[1:] or ['/usr/games/steam','-bigpicture']
+    managed = not sys.argv[1:]
+    done = Path(env['XDG_RUNTIME_DIR']) / 'steam-session.done'
+    if managed:
+        done.unlink(missing_ok=True)
+    command = sys.argv[1:] or ['python3','/opt/whale-steam/steam-session.py']
     sway = subprocess.Popen(launch_args(mode, command), env=env, start_new_session=True)
     print(f'parent mode verified, gamescope launched at negotiated rate: {mode}', flush=True)
     def stop(signum, frame):
@@ -79,12 +83,24 @@ def main():
     try:
         while sway.poll() is None:
             time.sleep(1)
+            if managed and done.exists():
+                return int(done.read_text())
             actual = read_parent(parent_env)
             if requires_recreation(mode, actual):
                 print(f'parent changed {mode} -> {actual}; recreate lobby with fresh negotiation', file=sys.stderr)
                 return 75
         return sway.returncode or 0
     finally:
+        if managed and not done.exists() and sway.poll() is None:
+            # Let Steam save state before tearing down its compositor.
+            try:
+                subprocess.run(['/opt/whale-steam/session-control', 'quit'],
+                               env=env, timeout=2, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            deadline = time.monotonic() + 45
+            while not done.exists() and sway.poll() is None and time.monotonic() < deadline:
+                time.sleep(.2)
         # Clean the entire isolated compositor/application process group.
         try:
             os.killpg(sway.pid, signal.SIGTERM)

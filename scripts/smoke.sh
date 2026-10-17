@@ -8,7 +8,15 @@ output * mode 1280x720@60Hz
 ' >"$XDG_RUNTIME_DIR/smoke.conf"
 dbus-run-session -- sway --unsupported-gpu -c "$XDG_RUNTIME_DIR/smoke.conf" >"$XDG_RUNTIME_DIR/sway.log" 2>&1 &
 p=$!
-trap 'kill "$p" 2>/dev/null || true' EXIT
+cleanup() {
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        ps -eo pid,ppid,args
+        tail -n 80 "$XDG_RUNTIME_DIR/steam.log" 2>/dev/null || true
+    fi
+    kill "$p" 2>/dev/null || true
+}
+trap cleanup EXIT
 for _ in $(seq 1 100); do [ -S "$SWAYSOCK" ] && break; sleep .1; done
 for rate in 60 90 120 144; do
     swaymsg output '*' mode "1280x720@${rate}Hz" >/dev/null

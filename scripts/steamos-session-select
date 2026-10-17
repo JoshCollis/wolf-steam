@@ -1,0 +1,7 @@
+#!/bin/bash
+# There is no desktop session in this image.
+set -euo pipefail
+case "${1:-desktop}" in
+    desktop|plasma|desktop-persistent) exec /opt/whale-steam/session-control quit ;;
+    *) echo 'This image provides a Steam session only' >&2; exit 64 ;;
+esac

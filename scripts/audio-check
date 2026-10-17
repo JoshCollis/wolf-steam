@@ -1,0 +1,19 @@
+#!/bin/bash
+# Use only the PulseAudio server supplied by the runner; never start another one.
+set -euo pipefail
+case "${1:-status}" in
+    status)
+        pactl info
+        pactl get-sink-volume @DEFAULT_SINK@
+        pactl get-sink-mute @DEFAULT_SINK@
+        ;;
+    volume)
+        [[ ${2:-} =~ ^([0-9]|[1-9][0-9]|100)%$ ]] || { echo 'Expected volume 0% to 100%' >&2; exit 64; }
+        pactl set-sink-volume @DEFAULT_SINK@ "$2"
+        ;;
+    mute|unmute)
+        value=0; [ "$1" != mute ] || value=1
+        pactl set-sink-mute @DEFAULT_SINK@ "$value"
+        ;;
+    *) echo 'Usage: audio-check [status|volume 0%-100%|mute|unmute]' >&2; exit 64 ;;
+esac

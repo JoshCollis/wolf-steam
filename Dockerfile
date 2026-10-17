@@ -13,7 +13,8 @@ LABEL org.opencontainers.image.title="wolf-steam" \
       org.opencontainers.image.licenses="MIT"
 RUN dpkg --add-architecture i386 && apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates curl python3 gosu util-linux dbus-daemon dbus-bin network-manager \
+      ca-certificates curl python3 python3-dbus python3-gi gosu util-linux dbus-daemon dbus-bin network-manager \
+      ibus zenity pulseaudio-utils locales pciutils \
       sway gamescope xwayland wayland-utils x11-utils x11-apps mesa-utils \
       steam-installer steam-libs:amd64 steam-libs:i386 \
       mesa-vulkan-drivers:amd64 mesa-vulkan-drivers:i386 \
@@ -21,12 +22,15 @@ RUN dpkg --add-architecture i386 && apt-get update && \
       libvulkan1:amd64 libvulkan1:i386 vulkan-tools \
       fonts-dejavu-core xdg-utils bubblewrap procps jq && \
     rm -rf /var/lib/apt/lists/* && \
-    userdel -r ubuntu && groupadd -g 1000 retro && useradd -m -u 1000 -g retro -s /bin/bash retro
+    userdel -r ubuntu && groupadd -g 1000 retro && useradd -m -u 1000 -g retro -s /bin/bash retro && \
+    localedef -i en_US -f UTF-8 en_US.UTF-8
 COPY --from=probe-builder /vulkan-device-64 /vulkan-device-32 /opt/whale-steam/
 COPY --chmod=755 scripts/ /opt/whale-steam/
 COPY --chmod=644 scripts/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf
+COPY --chmod=644 scripts/session-power.conf /etc/dbus-1/system.d/wolf-steam.conf
+RUN ln -s /opt/whale-steam/steamos-session-select /usr/bin/steamos-session-select
 COPY LICENSE NOTICE.md /usr/share/doc/wolf-steam/
 COPY vendor/gow/LICENSE /usr/share/doc/wolf-steam/gow-LICENSE
 COPY tests/ /opt/whale-steam/tests/
-ENV HOME=/home/retro PUID=1000 PGID=1000 RUN_SWAY=false RUN_GAMESCOPE=true
+ENV HOME=/home/retro PUID=1000 PGID=1000 RUN_SWAY=false RUN_GAMESCOPE=true LANG=en_US.UTF-8
 ENTRYPOINT ["/opt/whale-steam/entrypoint.sh"]

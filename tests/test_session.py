@@ -2,10 +2,32 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class SessionTests(unittest.TestCase):
+    def test_finished_steam_stops_lingering_compositor(self):
+        m = self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            env = {'XDG_RUNTIME_DIR': directory, 'GAMESCOPE_WIDTH': '1280',
+                   'GAMESCOPE_HEIGHT': '720', 'GAMESCOPE_REFRESH': '60'}
+            compositor = Mock(pid=456)
+            compositor.poll.return_value = None
+
+            def finish(_):
+                (pathlib.Path(directory) / 'steam-session.done').write_text('0')
+
+            with patch.dict(m.os.environ, env), patch.object(m.sys, 'argv', ['session.py']), \
+                 patch.object(m, 'read_parent', return_value=(1280, 720, 60000)), \
+                 patch.object(m.subprocess, 'Popen', return_value=compositor), \
+                 patch.object(m.time, 'sleep', side_effect=finish), \
+                 patch.object(m.signal, 'signal'), \
+                 patch.object(m.os, 'killpg') as killpg:
+                self.assertEqual(m.main(), 0)
+                killpg.assert_called_once_with(456, m.signal.SIGTERM)
+                compositor.wait.assert_called_once_with(timeout=8)
+
     def module(self):
         self.assertTrue((ROOT / 'scripts/session.py').exists(), 'session implementation missing')
         spec = importlib.util.spec_from_file_location('session', ROOT / 'scripts/session.py')

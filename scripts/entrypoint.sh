@@ -37,7 +37,7 @@ if [ "$(id -u)" = 0 ]; then
     exec gosu retro "$0" "$@"
 fi
 export HOME=/home/retro
-export PATH=/opt/whale-steam/bootstrap-bin:$PATH
+export PATH=/opt/whale-steam/bootstrap-bin:/usr/games:$PATH
 export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/whale-steam}
 umask 022
 mkdir -p "$HOME/.steam/ubuntu12_32/steam-runtime" "$HOME/.local/share/whale-steam"

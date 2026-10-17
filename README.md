@@ -1,93 +1,63 @@
 # wolf-steam
 
-Steam container for [Games-on-Whales Wolf](https://github.com/games-on-whales/wolf),
-using Ubuntu 26.04 LTS, gamescope, and native amd64/i386 Mesa packages.
-
-## Image
+Steam Big Picture container for [Games-on-Whales Wolf](https://github.com/games-on-whales/wolf).
+Ubuntu 26.04, gamescope, and amd64/i386 Mesa. AMD/Intel graphics only;
+proprietary NVIDIA driver injection is not included.
 
 ```sh
 docker pull ghcr.io/joshcollis/wolf-steam:latest
 ```
 
-Pushes to `main` build and test the image, then publish `latest`, `main`, and
-`sha-<full commit SHA>` tags to GHCR. Pull requests run the same tests without
-publishing. For reproducible deployments, use an image digest instead of `latest`.
-GHCR package visibility is managed separately from repository visibility; the
-package must be public to allow anonymous pulls.
+Pushes to `main` test and publish `latest`, `main`, and `sha-<commit>` to GHCR.
+Use a digest to pin a deployment.
 
-## Wolf configuration
+## Configuration
 
-See [`examples/wolf.config.toml`](examples/wolf.config.toml). Add the app to a
-separate profile first and check Wolf's generated device, audio, input, and home mounts.
-The example uses unconfined seccomp/AppArmor for Steam Runtime compatibility;
-review those permissions before deploying.
+Start with [`examples/wolf.config.toml`](examples/wolf.config.toml) in a separate
+profile. Review its unconfined seccomp/AppArmor settings before deployment.
 
-- Mount a persistent, per-profile/app home at `/home/retro` before startup.
-  Steam, libraries, Proton prefixes, shader caches, and login state live there.
-- `PUID` and `PGID` default to `1000`. Existing files must already have the intended
-  ownership; startup does not recursively change home ownership.
-- Pass the required `/dev/dri` and `/dev/input` devices. Supplementary groups are
-  derived from the mounted devices rather than fixed host group IDs.
+- Persist `/home/retro` per profile/app. Steam, login state, Proton prefixes,
+  and shader caches live there. External libraries also need persistent mounts.
+- `PUID`/`PGID` default to `1000`. Existing files must have matching ownership;
+  startup does not recursively change it.
+- Pass GPU/input devices and Wolf's audio socket. Device groups are detected
+  from the mounted devices. No host D-Bus socket is needed.
 - Wolf must supply `WAYLAND_DISPLAY`, `GAMESCOPE_WIDTH`, `GAMESCOPE_HEIGHT`, and
-  `GAMESCOPE_REFRESH`. Supported refresh rates are 60, 90, 120, and 144 Hz.
-- Keep `RUN_SWAY=false` and `RUN_GAMESCOPE=true`. The parent Wayland output must
-  match the negotiated dimensions and refresh rate or startup fails.
+  `GAMESCOPE_REFRESH` (60, 90, 120, or 144 Hz).
+- Keep `RUN_SWAY=false` and `RUN_GAMESCOPE=true`. A mismatched parent mode fails
+  startup. A changed mode exits with code 75; recreate the lobby with the same home.
 
-The supervisor checks the parent mode every second. A changed supported mode
-stops the session with exit code 75; recreate the lobby with the new negotiation
-and the same persistent home. Same-mode reconnects keep the session running.
-Missing or invalid parent modes stop the session rather than using a fallback.
+Steam downloads from Valve on first launch and updates in the persistent home.
+NetworkManager provides container-local connectivity status without controlling
+Docker's interfaces or DNS. Offline status does not block startup.
 
-Steam is downloaded from Valve on first use and updates in the persistent home.
-Only the installer's download confirmation is automated; login and terms are not.
+## Session controls
 
-## Container network status
+Desktop and Power Off end this app. Restart restarts Steam. These actions never
+control host power. Suspend/hibernate are unavailable; Steam decides whether to
+hide their menu items. Save games before ending a session.
 
-The image starts a container-local system D-Bus and NetworkManager for Steam Big
-Picture's network indicator. NetworkManager reads Docker's existing `eth0`
-connection without managing DNS or creating a DHCP profile, and runs without
-`NET_ADMIN`. No host D-Bus socket is required. Connectivity is checked through
-`http://steamconnecttest.com/204`; offline status does not block Steam startup.
+Steam runs with `-steamos3` for session hooks. This may select its SteamOS client
+channel and expose unsupported OS settings. Set `STEAM_OS_SESSION_HOOKS=0` to
+disable it if an overlay/client regression occurs; Desktop switching may then
+stop working. This image does not provide SteamOS updates or a desktop environment.
 
-## Steam integration and focus
+Allow at least 55 seconds for container shutdown so Steam can save state.
+IBus supports text entry; Steam volume controls use Wolf's PulseAudio server.
+`/opt/whale-steam/audio-check` reports the current sink; it also accepts
+`volume 50%`, `mute`, and `unmute`.
 
-Gamescope runs with `-e` (`--steam`) so Steam's application IDs can control focus
-between Big Picture and games. Run the focus regression on a GPU host:
+## Verification
 
-```sh
-python3 tests/gamescope_focus.py
-```
+CI runs software tests against the built image. On a GPU test host, run
+`IMAGE=<candidate-tag> bash tests/run-gpu.sh` for native Vulkan, focus, and Steam
+restart/exit checks. Tests use disposable containers, not Wolf profiles.
 
-Use `--ssh <host>` for a remote GPU host, and `--image`, `--card`, and `--render`
-to select the image and DRM devices. Both DRM nodes are required. The test uses
-disposable, network-disabled containers and synthetic windows; results are saved
-under `artifacts/steam-focus-*`. It tests focus routing, not Steam overlay rendering.
-
-## Development
-
-Requires Docker and Python 3:
-
-```sh
-bash tests/run-local.sh
-```
-
-Tests cover mode negotiation, reconnect policy, 32/64-bit software Vulkan device
-creation, Xwayland software rendering, Steam bootstrap/webhelper startup, and
-persistence across container recreation. Steam tests require network access.
-Test containers and their temporary volume are removed afterward.
-
-These software tests do not establish native GPU compatibility, Proton game
-support, audio/input operation, or end-to-end stream cadence. Verify those on
-your Wolf host. Native Vulkan probes are available as:
-
-```sh
-/opt/whale-steam/vulkan-device-64 --native
-/opt/whale-steam/vulkan-device-32 --native
-```
-
-Only linux/amd64 is supported. Proprietary NVIDIA driver injection is not included.
+Before rollout, check controller keyboard entry, in-game overlays, audio, menu
+actions, and reconnects in a separate Wolf profile. Headless tests do not verify
+Moonlight playback or end-to-end frame cadence.
 
 ## License
 
-Project source is MIT licensed. See [`NOTICE.md`](NOTICE.md) for upstream attribution
-and third-party licensing. This is not an official Valve, Ubuntu, Wolf, or GoW product.
+MIT. See [`NOTICE.md`](NOTICE.md) for third-party attribution and licensing.
+Not an official Valve, Ubuntu, Wolf, or GoW product.

@@ -24,10 +24,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Build and test
+      - name: Build image
         env:
           IMAGE_SOURCE: https://github.com/${{ github.repository }}
-        run: bash tests/run-local.sh
+        run: docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" -t wolf-steam:ci .
+      - name: Test image
+        env:
+          IMAGE: wolf-steam:ci
+        run: bash tests/verify-image.sh
       - name: Log in to GHCR
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -44,7 +48,7 @@ jobs:
           set -euo pipefail
           image="ghcr.io/${REPOSITORY,,}"
           for tag in "sha-${REVISION}" main latest; do
-            docker tag whale-steam:local-test "${image}:${tag}"
+            docker tag wolf-steam:ci "${image}:${tag}"
             docker push "${image}:${tag}"
           done
           docker buildx imagetools inspect "${image}:sha-${REVISION}"
