@@ -41,6 +41,28 @@ Missing or invalid parent modes stop the session rather than using a fallback.
 Steam is downloaded from Valve on first use and updates in the persistent home.
 Only the installer's download confirmation is automated; login and terms are not.
 
+## Container network status
+
+The image starts a container-local system D-Bus and NetworkManager for Steam Big
+Picture's network indicator. NetworkManager reads Docker's existing `eth0`
+connection without managing DNS or creating a DHCP profile, and runs without
+`NET_ADMIN`. No host D-Bus socket is required. Connectivity is checked through
+`http://steamconnecttest.com/204`; offline status does not block Steam startup.
+
+## Steam integration and focus
+
+Gamescope runs with `-e` (`--steam`) so Steam's application IDs can control focus
+between Big Picture and games. Run the focus regression on a GPU host:
+
+```sh
+python3 tests/gamescope_focus.py
+```
+
+Use `--ssh <host>` for a remote GPU host, and `--image`, `--card`, and `--render`
+to select the image and DRM devices. Both DRM nodes are required. The test uses
+disposable, network-disabled containers and synthetic windows; results are saved
+under `artifacts/steam-focus-*`. It tests focus routing, not Steam overlay rendering.
+
 ## Development
 
 Requires Docker and Python 3:

@@ -13,7 +13,7 @@ LABEL org.opencontainers.image.title="wolf-steam" \
       org.opencontainers.image.licenses="MIT"
 RUN dpkg --add-architecture i386 && apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates curl python3 gosu util-linux dbus-daemon \
+      ca-certificates curl python3 gosu util-linux dbus-daemon dbus-bin network-manager \
       sway gamescope xwayland wayland-utils x11-utils x11-apps mesa-utils \
       steam-installer steam-libs:amd64 steam-libs:i386 \
       mesa-vulkan-drivers:amd64 mesa-vulkan-drivers:i386 \
@@ -24,6 +24,7 @@ RUN dpkg --add-architecture i386 && apt-get update && \
     userdel -r ubuntu && groupadd -g 1000 retro && useradd -m -u 1000 -g retro -s /bin/bash retro
 COPY --from=probe-builder /vulkan-device-64 /vulkan-device-32 /opt/whale-steam/
 COPY --chmod=755 scripts/ /opt/whale-steam/
+COPY --chmod=644 scripts/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf
 COPY LICENSE NOTICE.md /usr/share/doc/wolf-steam/
 COPY vendor/gow/LICENSE /usr/share/doc/wolf-steam/gow-LICENSE
 COPY tests/ /opt/whale-steam/tests/

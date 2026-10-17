@@ -32,6 +32,8 @@ if [ "$(id -u)" = 0 ]; then
     fi
     export XDG_RUNTIME_DIR=/run/whale-steam
     install -d -m 700 -o "$PUID" -g "$PGID" "$XDG_RUNTIME_DIR"
+    export DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+    /opt/whale-steam/network-status.sh || echo 'network-status: startup failed; continuing' >&2
     exec gosu retro "$0" "$@"
 fi
 export HOME=/home/retro

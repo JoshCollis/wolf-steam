@@ -46,6 +46,20 @@ class SessionTests(unittest.TestCase):
             self.assertEqual(args[args.index('-r')+1], str(r))
             self.assertEqual(args[-3:], ['--','steam','-bigpicture'])
 
+    def test_gamescope_steam_integration_precedes_command_separator(self):
+        m = self.module()
+        command = ['/usr/games/steam', '-bigpicture']
+        for rate in (60, 90, 120, 144):
+            with self.subTest(rate=rate):
+                args = m.launch_args((1920, 1200, rate * 1000), command)
+                separator = args.index('--')
+                self.assertIn('-e', args[:separator],
+                              'Steam IDs/focus control require Gamescope Steam integration')
+                self.assertEqual(args[separator + 1:], command)
+                self.assertEqual(args[args.index('-r') + 1], str(rate))
+                self.assertEqual(args[args.index('-W') + 1], '1920')
+                self.assertEqual(args[args.index('-H') + 1], '1200')
+
     def test_changed_reconnect_requires_recreation(self):
         m = self.module()
         self.assertFalse(m.requires_recreation((1920,1080,60000),(1920,1080,60000)))

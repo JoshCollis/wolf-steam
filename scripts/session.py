@@ -55,7 +55,9 @@ def read_parent(env):
 
 def launch_args(mode, command):
     w,h,r = mode
-    return ['/usr/games/gamescope','-b','-W',str(w),'-H',str(h),'-w',str(w),'-h',str(h),'-r',str(r//1000),'--',*command]
+    # Steam controls focus by app ID (769 for its UI), not X11 window ID.
+    # Without Steam mode those requests cannot match Gamescope's app list.
+    return ['/usr/games/gamescope','-e','-b','-W',str(w),'-H',str(h),'-w',str(w),'-h',str(h),'-r',str(r//1000),'--',*command]
 
 def requires_recreation(previous, actual):
     return previous != reconnect(previous, actual)
