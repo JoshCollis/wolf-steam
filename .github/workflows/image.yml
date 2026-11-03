@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '43 5 * * 1'
 
 permissions:
   contents: read
@@ -24,10 +26,33 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Check refresh policy
+        run: python3 -m unittest discover -s tests -p 'test_refresh.py' -v
       - name: Build image
         env:
           IMAGE_SOURCE: https://github.com/${{ github.repository }}
-        run: docker build --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" -t wolf-steam:ci .
+          IMAGE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Resolve only the official, supported LTS tag, on every run.
+          docker pull --platform linux/amd64 ubuntu:26.04
+          base=$(docker image inspect ubuntu:26.04 --format '{{index .RepoDigests 0}}')
+          [[ "$base" =~ ^ubuntu@sha256:[0-9a-f]{64}$ ]]
+          docker build --platform linux/amd64 --pull --no-cache \
+            --build-arg BASE_IMAGE="$base" --build-arg BASE_DIGEST="${base#*@}" \
+            --build-arg IMAGE_SOURCE="$IMAGE_SOURCE" --build-arg IMAGE_REVISION="$IMAGE_REVISION" \
+            -t wolf-steam:ci .
+          printf '%s\n' "Resolved official Ubuntu 26.04 base: \`$base\` (linux/amd64)." >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain package refresh evidence
+        run: |
+          set -euo pipefail
+          mkdir package-evidence
+          docker run --rm --entrypoint tar wolf-steam:ci -C /usr/share/wolf-steam -cf - . | tar -xf - -C package-evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: package-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: package-evidence/
+          if-no-files-found: error
       - name: Test image
         env:
           IMAGE: wolf-steam:ci
@@ -44,12 +69,13 @@ jobs:
         env:
           REPOSITORY: ${{ github.repository }}
           REVISION: ${{ github.sha }}
+          RUN_TAG: run-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
           image="ghcr.io/${REPOSITORY,,}"
-          for tag in "sha-${REVISION}" main latest; do
+          for tag in "sha-${REVISION}" main latest "$RUN_TAG"; do
             docker tag wolf-steam:ci "${image}:${tag}"
             docker push "${image}:${tag}"
           done
           docker buildx imagetools inspect "${image}:sha-${REVISION}"
-          printf 'Published `%s:sha-%s`, `%s:main` and `%s:latest`.\n' "$image" "$REVISION" "$image" "$image" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "Published tested \`$image\` with tags \`sha-$REVISION\`, \`main\`, \`latest\`, \`$RUN_TAG\`." >> "$GITHUB_STEP_SUMMARY"

@@ -11,6 +11,39 @@ docker pull ghcr.io/joshcollis/wolf-steam:latest
 Pushes to `main` test and publish `latest`, `main`, and `sha-<commit>` to GHCR.
 Use a digest to pin a deployment.
 
+## Scheduled dependency refresh
+
+Every Monday at **05:43 UTC**, and on push/manual runs, CI resolves the current
+official `ubuntu:26.04` base to an immutable digest for both build stages. It
+builds explicitly for `linux/amd64` with `--pull --no-cache`, updates APT indexes
+with errors fatal, upgrades within 26.04, and installs the amd64/i386 dependencies.
+It does not track `latest` Ubuntu or migrate to 26.10. The Dockerfile's local
+default remains digest-pinned; overriding `BASE_IMAGE` also requires the matching
+`BASE_DIGEST` label argument. Use CI's uncached build flags for a local refresh.
+
+[Ubuntu 26.04 LTS has standard support through May 2031](https://ubuntu.com/about/release-cycle)
+(verified November 2026). Builds reject another release or a date after that
+month. Package coverage varies by component: LTS support does not guarantee
+every Universe/Multiverse Steam or gaming package receives every security fix;
+no Ubuntu Pro/ESM entitlement is assumed. Updates follow the available 26.04
+repositories, not arbitrary upstream releases.
+
+Each image contains `/usr/share/wolf-steam/{base-image.txt,base-os-release,packages.json,apt-policy.txt}`;
+CI retains these as a run-specific package-evidence artifact. The build compares
+every installed package version (including both architectures) with its freshly
+indexed APT candidate and fails on a mismatch. This is timestamped repository
+snapshot evidence, not proof from a moving container tag or a perpetual security
+guarantee. Only after software acceptance does `main` publish that exact image
+as `latest`, `main`, `sha-<commit>` and unique `run-<id>-<attempt>`; scheduled
+same-commit builds can change packages, so use the run tag or digest for identity.
+PRs and non-main manual runs never publish.
+
+Steam self-updates inside persisted HOME; the container tag is **not** the Steam
+client version. Refreshes preserve HOME, libraries and existing game/Proton
+prefixes: no mass prefix migration or forced Proton updates. Publishing/pulling
+does not adopt an image in a live session. There is no Watchtower or automatic
+restart; choose a maintenance window to recreate the app after saving games.
+
 ## Configuration
 
 Start with [`examples/wolf.config.toml`](examples/wolf.config.toml) in a separate
