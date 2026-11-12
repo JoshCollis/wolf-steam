@@ -37,12 +37,27 @@ class SessionTests(unittest.TestCase):
 
     def test_requested_rates(self):
         m = self.module()
-        for rate in (60, 90, 120, 144):
+        for rate in (60, 75, 90, 100, 120, 144, 165, 240):
             self.assertEqual(m.requested({'GAMESCOPE_WIDTH':'1920', 'GAMESCOPE_HEIGHT':'1080', 'GAMESCOPE_REFRESH':str(rate)}), (1920,1080,rate*1000))
+
+    def test_ultrawide_modes_reach_gamescope_unchanged(self):
+        m = self.module()
+        for width, height, rate in ((2560, 1080, 75), (3440, 1440, 100),
+                                    (3840, 1600, 144), (5120, 1440, 240), (7680, 2160, 120)):
+            with self.subTest(width=width, height=height, rate=rate):
+                wanted = m.requested({'GAMESCOPE_WIDTH':str(width), 'GAMESCOPE_HEIGHT':str(height),
+                                      'GAMESCOPE_REFRESH':str(rate)})
+                parent = m.parent_mode(f'width: {width} px, height: {height} px, refresh: {rate}.000 Hz,\n\tflags: current')
+                mode = m.agree(wanted, parent)
+                self.assertEqual(mode, (width, height, rate * 1000))
+                self.assertFalse(m.requires_recreation(mode, parent))
+                args = m.launch_args(mode, ['steam', '-bigpicture'])
+                for flag, value in (('-W', width), ('-H', height), ('-w', width), ('-h', height), ('-r', rate)):
+                    self.assertEqual(args[args.index(flag) + 1], str(value))
 
     def test_invalid_and_missing_requests_fail(self):
         m = self.module()
-        for rate in ('', '0', '145', '144; true', '60.5'):
+        for rate in ('', '0', '-1', '1001', '144; true', '60.5'):
             with self.assertRaises(ValueError):
                 m.requested({'GAMESCOPE_WIDTH':'1920', 'GAMESCOPE_HEIGHT':'1080', 'GAMESCOPE_REFRESH':rate})
         with self.assertRaises(ValueError):
@@ -97,10 +112,10 @@ class SessionTests(unittest.TestCase):
 
     def test_reconnect_never_keeps_stale_refresh(self):
         m = self.module()
-        for rate in (60,90,120,144):
+        for rate in (60,75,90,100,120,144,165,240):
             self.assertEqual(m.reconnect((1920,1080,60000), (2560,1440,rate*1000)), (2560,1440,rate*1000))
         with self.assertRaises(ValueError):
-            m.reconnect((1920,1080,60000), (1920,1080,75000))
+            m.reconnect((1920,1080,60000), (1920,1080,59940))
 
     def test_runtime_config_not_persistent_home(self):
         m = self.module()

@@ -56,7 +56,8 @@ profile. Review its unconfined seccomp/AppArmor settings before deployment.
 - Pass GPU/input devices and Wolf's audio socket. Device groups are detected
   from the mounted devices. No host D-Bus socket is needed.
 - Wolf must supply `WAYLAND_DISPLAY`, `GAMESCOPE_WIDTH`, `GAMESCOPE_HEIGHT`, and
-  `GAMESCOPE_REFRESH` (60, 90, 120, or 144 Hz).
+  `GAMESCOPE_REFRESH` (integer Hz, 1–1000). Ultrawide modes such as 3440×1440 at
+  100 Hz and 5120×1440 are passed through without changing their aspect ratio.
 - Keep `RUN_SWAY=false` and `RUN_GAMESCOPE=true`. A mismatched parent mode fails
   startup. A changed mode exits with code 75; recreate the lobby with the same home.
 

@@ -9,15 +9,13 @@ import sys
 import time
 from pathlib import Path
 
-RATES = (60000, 90000, 120000, 144000)
-
 def requested(env):
     values = [env.get(k, '') for k in ('GAMESCOPE_WIDTH', 'GAMESCOPE_HEIGHT', 'GAMESCOPE_REFRESH')]
     if any(not re.fullmatch(r'[0-9]+', v) for v in values):
         raise ValueError('Wolf must supply integer width, height and negotiated refresh')
     w, h, r = map(int, values)
-    if not (320 <= w <= 7680 and 200 <= h <= 4320 and r * 1000 in RATES):
-        raise ValueError('Unsupported negotiated mode; allowed refresh: 60/90/120/144')
+    if not (320 <= w <= 7680 and 200 <= h <= 4320 and 1 <= r <= 1000):
+        raise ValueError('Unsupported negotiated mode; width 320–7680, height 200–4320, refresh 1–1000 Hz')
     return w, h, r * 1000
 
 def parent_mode(text):
@@ -35,9 +33,9 @@ def agree(wanted, actual):
 
 def reconnect(previous, actual):
     w,h,r = actual
+    if r % 1000:
+        raise ValueError('Parent refresh must be an integer Hz value')
     requested({'GAMESCOPE_WIDTH':str(w),'GAMESCOPE_HEIGHT':str(h),'GAMESCOPE_REFRESH':str(r//1000)})
-    if r not in RATES:
-        raise ValueError('Unsupported parent refresh on reconnect')
     return actual
 
 def config(mode):
